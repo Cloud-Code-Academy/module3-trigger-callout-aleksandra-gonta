@@ -8,6 +8,7 @@ public with sharing class NewsAPIService {
     
     // TODO: Define default parameters
     private static final Integer DEFAULT_PAGE_SIZE = 20; 
+    private static final Integer DEFAULT_PAGE = 1;
     
     /**
      * Fetches top headlines for a specified category with pagination support
@@ -17,13 +18,18 @@ public with sharing class NewsAPIService {
      * @return NewsAPIResponse The wrapper object containing the API response
      */
     public static NewsAPIResponse getTopHeadlinesByCategory(String category, Integer pageSize, Integer page) {
-        // TODO: Implement method to fetch headlines by category
-        // - Validate and set defaults for parameters
-        // - Build the request URL
-        // - Make the callout
-        // - Parse and return the response
+        if (category == null) {
+            throw new NewsAPIException('Category cannot be null or empty');
+        }
+
+        String endpoint = API_NAMED_CREDENTIAL + API_ENDPOINT + '?category=' + category;
+        endpoint += '&pageSize=' + (pageSize != null ? pageSize : DEFAULT_PAGE_SIZE);
+        endpoint += '&page=' + (page != null ? page : DEFAULT_PAGE);
         
-        return null;
+        HttpResponse httpResponse = makeCallout(endpoint);
+        NewsAPIResponse parsedResponse = parseResponse(httpResponse.getBody());
+
+        return parsedResponse;
     }
     
     /**
@@ -32,12 +38,21 @@ public with sharing class NewsAPIService {
      * @return HttpResponse The HTTP response
      */
     private static HttpResponse makeCallout(String endpoint) {
-        // TODO: Implement HTTP callout
-        // - Create and configure HTTP request
-        // - Make the callout
-        // - Handle exceptions
+        Http http = new Http();
+        HttpRequest request = new HttpRequest();
+        request.setEndpoint(endpoint);
+        request.setMethod('GET');
         
-        return null;
+        try {
+            HttpResponse response = http.send(request);
+            if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
+              return response;
+            }else{
+               throw new NewsAPIException('Error: ' + response.getStatus() + ' - ' + response.getBody()); 
+            }
+        } catch (Exception e) {
+            throw new NewsAPIException('Error' + e.getMessage());
+        }
     }
     
     /**
@@ -45,12 +60,12 @@ public with sharing class NewsAPIService {
      * @param jsonResponse The JSON response string
      * @return NewsAPIResponse The parsed response object
      */
-    private static NewsAPIResponse parseResponse(String jsonResponse) {
-        // TODO: Implement JSON parsing
-        // - Deserialize JSON to NewsAPIResponse
-        // - Handle exceptions
-        
-        return null;
+    public static NewsAPIResponse parseResponse(String jsonResponse) {
+        try {
+            return (NewsAPIResponse) JSON.deserialize(jsonResponse, NewsAPIResponse.class);
+        } catch (System.JSONException e) {
+            throw new NewsAPIException('Failed to parse JSON response: ' + e.getMessage());
+        }
     }
     
     /**
