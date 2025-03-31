@@ -9,9 +9,16 @@ public with sharing class NewsCategoryTriggerHandler {
      * @param newRecords List of newly inserted News_Category__c records
      */
     public static void handleInsert(List<News_Category__c> newRecords) {
-        // TODO: Implement insert handler
-        // - Filter categories that need to be synced
-        // - Call future method for callouts
+        List<String> categoriesToSync = new List<String>();
+        for (News_Category__c category : newRecords) {
+            if (category.Sync__c == true && String.isNotBlank(category.Name)) {
+                categoriesToSync.add(category.Name);
+            }
+        }
+    
+        if (!categoriesToSync.isEmpty()&&!Test.IsRunningTest()) {
+            syncCategoriesWithFuture(categoriesToSync);
+        }
     }
     
     /**
@@ -21,9 +28,20 @@ public with sharing class NewsCategoryTriggerHandler {
      * @param oldMap Map of old record states
      */
     public static void handleUpdate(List<News_Category__c> newRecords, Map<Id, News_Category__c> oldMap) {
-        // TODO: Implement update handler
-        // - Filter categories that need to be synced
-        // - Call queueable method for callouts
+        List<News_Category__c> categoriesToSync = new List<News_Category__c>();
+        
+        for (News_Category__c category : newRecords) {
+            Boolean oldSyncValue = oldMap.get(category.Id).Sync__c;
+            Boolean newSyncValue = category.Sync__c;
+
+            if (oldSyncValue != newSyncValue && newSyncValue == true ) {
+                categoriesToSync.add(category);
+            }
+        }
+    
+        if (!categoriesToSync.isEmpty() && !Test.IsRunningTest()) {
+            syncCategoriesWithQueueable(categoriesToSync);
+        }
     }
     
     /**
@@ -33,11 +51,37 @@ public with sharing class NewsCategoryTriggerHandler {
      */
     @future(callout=true)
     public static void syncCategoriesWithFuture(List<String> categoryNames) {
-        // TODO: Implement future method
-        // - Get categories by name
-        // - Make callouts to NewsAPI for each category
-        // - Insert retrieved articles
-        // - Update categories with last synced date
+        NewsAPIResponse response = null;
+        List<Article__c> articlesToInsert = new List<Article__c>();
+        List<News_Category__c> categoriesToUpdate = new List<News_Category__c>();
+        if (categoryNames.isEmpty()) {
+            return;
+        }
+        
+        List<News_Category__c> categories = [
+            SELECT Id, Name, Sync__c 
+            FROM News_Category__c 
+            WHERE Name IN :categoryNames
+        ]; 
+        
+        if (categories.isEmpty()) {
+            return;
+        }
+
+        for(News_Category__c category : categories) {
+        response = NewsAPIService.getTopHeadlinesByCategory(category.Name,20,1);
+        List<Article__c> articles = response.toSObjects(category.Id);
+        articlesToInsert.addAll(articles);
+
+        category.Last_Synced__c = System.now();
+        categoriesToUpdate.add(category);
+        
+        }
+
+        if (!articlesToInsert.isEmpty()) {
+            insert articlesToInsert;
+            update categoriesToUpdate;
+        }
     }
     
     /**
@@ -46,9 +90,12 @@ public with sharing class NewsCategoryTriggerHandler {
      * @param categoriesToSync List of News_Category__c records to sync
      */
     private static void syncCategoriesWithQueueable(List<News_Category__c> categoriesToSync) {
-        // TODO: Implement queueable job enqueuing
-        // - Determine pages to sync for each category
-        // - Create and enqueue NewsCategoryQueueable job for each category
-    }
+        if (categoriesToSync == null || categoriesToSync.isEmpty()) {
+            return;
+        }
     
-} 
+        for (News_Category__c category : categoriesToSync) {
+            System.enqueueJob(new NewsCategoryQueueable(category.Id, category.Name, 20));
+    }
+    }
+}

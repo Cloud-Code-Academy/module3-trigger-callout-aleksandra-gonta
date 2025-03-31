@@ -14,7 +14,10 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
      * @param pages Total pages to sync
      */
     public NewsCategoryQueueable(Id categoryId, String categoryName, Integer pages) {
-        // TODO: Initialize first page
+        this.categoryId = categoryId;
+        this.categoryName = categoryName;
+        this.pages = pages;
+        this.currentPage = 1; 
     }
     
     /**
@@ -25,7 +28,10 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
      * @param currentPage Current page being processed
      */
     public NewsCategoryQueueable(Id categoryId, String categoryName, Integer pages, Integer currentPage) {
-        // TODO: Initialize with specific page
+        this.categoryId = categoryId;
+        this.categoryName = categoryName;
+        this.pages = pages;
+        this.currentPage = currentPage;
     }
     
     /**
@@ -33,10 +39,22 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
      * @param context The QueueableContext
      */
     public void execute(QueueableContext context) {
-        // TODO: Implement execute method
-        // - Call NewsAPI for the current page
-        // - Process and save articles
-        // - Update category if last page
-        // - Chain to next page if more pages exist
+            News_Category__c category = [SELECT Id, Name, Sync__c FROM News_Category__c WHERE Id = :categoryId LIMIT 1];
+            NewsAPIResponse response = NewsAPIService.getTopHeadlinesByCategory(categoryName, pages, currentPage);
+            List<Article__c> articlesToInsert = new List<Article__c>();
+                
+            articlesToInsert = response.toSObjects(categoryId);
+            
+            if (!articlesToInsert.isEmpty()) {
+                insert articlesToInsert;
+            }
+    
+            // Check if this is the last page
+            if (currentPage < pages) {
+                System.enqueueJob(new NewsCategoryQueueable(categoryId, categoryName, pages, currentPage + 1));
+            } else {
+                category.Last_Synced__c = System.now();
+                update category;
+            }
     }
-} 
+}
