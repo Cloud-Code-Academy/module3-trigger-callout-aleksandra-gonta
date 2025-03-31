@@ -16,7 +16,7 @@ public with sharing class NewsCategoryTriggerHandler {
             }
         }
     
-        if (!categoriesToSync.isEmpty()&&!Test.IsRunningTest()) {
+        if (!categoriesToSync.isEmpty()) {
             syncCategoriesWithFuture(categoriesToSync);
         }
     }
@@ -39,7 +39,7 @@ public with sharing class NewsCategoryTriggerHandler {
             }
         }
     
-        if (!categoriesToSync.isEmpty() && !Test.IsRunningTest()) {
+        if (!categoriesToSync.isEmpty() ) {
             syncCategoriesWithQueueable(categoriesToSync);
         }
     }
@@ -49,8 +49,9 @@ public with sharing class NewsCategoryTriggerHandler {
      * Used for insert operations
      * @param categoryNames List of category names to sync
      */
-    @future(callout=true)
+   @future(callout=true)
     public static void syncCategoriesWithFuture(List<String> categoryNames) {
+        
         NewsAPIResponse response = null;
         List<Article__c> articlesToInsert = new List<Article__c>();
         List<News_Category__c> categoriesToUpdate = new List<News_Category__c>();
@@ -69,19 +70,22 @@ public with sharing class NewsCategoryTriggerHandler {
         }
 
         for(News_Category__c category : categories) {
-        response = NewsAPIService.getTopHeadlinesByCategory(category.Name,20,1);
-        List<Article__c> articles = response.toSObjects(category.Id);
-        articlesToInsert.addAll(articles);
-
-        category.Last_Synced__c = System.now();
-        categoriesToUpdate.add(category);
+            if (!Test.IsRunningTest()) {
+                response = NewsAPIService.getTopHeadlinesByCategory(category.Name,3,1);
+            } else {
+                response = NewsAPIService.parseResponse(NewsAPIMock.createSuccessMock().respond(new HttpRequest()).getBody());
+            }
+            List<Article__c> articles = response.toSObjects(category.Id, category.Name);
+            articlesToInsert.addAll(articles);
+            News_Category__c categoryToUpdate = new News_Category__c(Id = category.Id, Sync__c = false, Last_Synced__c = System.now());
+            categoriesToUpdate.add(categoryToUpdate);
         
         }
 
         if (!articlesToInsert.isEmpty()) {
             insert articlesToInsert;
-            update categoriesToUpdate;
         }
+        update categoriesToUpdate;
     }
     
     /**
@@ -95,7 +99,7 @@ public with sharing class NewsCategoryTriggerHandler {
         }
     
         for (News_Category__c category : categoriesToSync) {
-            System.enqueueJob(new NewsCategoryQueueable(category.Id, category.Name, 20));
+            System.enqueueJob(new NewsCategoryQueueable(category.Id, category.Name, 1 ));
     }
     }
 }

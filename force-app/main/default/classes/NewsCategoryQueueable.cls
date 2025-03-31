@@ -43,17 +43,16 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
             NewsAPIResponse response = NewsAPIService.getTopHeadlinesByCategory(categoryName, pages, currentPage);
             List<Article__c> articlesToInsert = new List<Article__c>();
                 
-            articlesToInsert = response.toSObjects(categoryId);
+            articlesToInsert = response.toSObjects(categoryId, categoryName);
             
             if (!articlesToInsert.isEmpty()) {
                 insert articlesToInsert;
             }
-    
-            // Check if this is the last page
             if (currentPage < pages) {
-                System.enqueueJob(new NewsCategoryQueueable(categoryId, categoryName, pages, currentPage + 1));
+               System.enqueueJob(new NewsCategoryQueueable(categoryId, categoryName, pages, currentPage + 1));
             } else {
                 category.Last_Synced__c = System.now();
+                category.Sync__c = false;
                 update category;
             }
     }

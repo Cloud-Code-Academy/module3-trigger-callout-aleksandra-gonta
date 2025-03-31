@@ -24,11 +24,10 @@ public class NewsAPIResponse {
          * Converts the API article to a Salesforce Article__c record
          * @return Article__c The Salesforce record
          */
-        public Article__c toSObject(Id categoryId) {
-            Datetime parsedPublishedAt = Datetime.valueOf(this.publishedAt.replace('Z', ''));
+        public Article__c toSObject(Id categoryId, String categoryName) {
+            DateTime parsedPublishedAt = (DateTime)JSON.deserialize('"' + this.publishedAt + '"', DateTime.class);
             String[] titleWords = title.split(' ');
             String uniqueName = titleWords[0] + '_' + titleWords[1] + '_' + parsedPublishedAt.format('yyyy-MM-dd');
-             
             Article__c articleObj = new Article__c();
             articleObj.name = uniqueName;
             articleObj.Source__c = source.name;
@@ -37,9 +36,10 @@ public class NewsAPIResponse {
             articleObj.Description__c = this.description.length() > 32768 ? this.description.substring(0,32768) : this.description;
             articleObj.Url__c = this.url;
             articleObj.UrlToImage__c = this.urlToImage != null && this.urlToImage.length() > 255 ? this.urlToImage.substring(0,255) : this.urlToImage;
-            articleObj.Published_At__c = parsedPublishedAt;
+            articleObj.Published_At__c = Datetime.valueOf(parsedPublishedAt);
             articleObj.Content__c = this.content;
-            articleObj.News_Category__c = categoryId;      
+            articleObj.News_Category__c = categoryId;
+            articleObj.Category__c = categoryName;      
             
             return articleObj;
         }
@@ -57,10 +57,10 @@ public class NewsAPIResponse {
      * Helper method to convert all articles in this response to Salesforce records
      * @return List<Article__c> List of Salesforce records
      */
-    public List<Article__c> toSObjects(Id categoryId) {
+    public List<Article__c> toSObjects(Id categoryId, String categoryName) {
         List<Article__c> articleObjList = new List<Article__c>();
         for (NewsAPIResponse.Article article : this.articles) {
-            Article__c articleObj = article.toSObject(categoryId);
+            Article__c articleObj = article.toSObject(categoryId, categoryName);
             articleObjList.add(articleObj);
         }
         return articleObjList;
