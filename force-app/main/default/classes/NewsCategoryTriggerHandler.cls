@@ -70,16 +70,18 @@ public with sharing class NewsCategoryTriggerHandler {
         }
 
         for(News_Category__c category : categories) {
-            if (!Test.IsRunningTest()) {
-                response = NewsAPIService.getTopHeadlinesByCategory(category.Name,3,1);
-            } else {
-                response = NewsAPIService.parseResponse(NewsAPIMock.createSuccessMock().respond(new HttpRequest()).getBody());
-            }
-            List<Article__c> articles = response.toSObjects(category.Id, category.Name);
-            articlesToInsert.addAll(articles);
-            News_Category__c categoryToUpdate = new News_Category__c(Id = category.Id, Sync__c = false, Last_Synced__c = System.now());
-            categoriesToUpdate.add(categoryToUpdate);
-        
+
+            if (Limits.getCallouts() < Limits.getLimitCallouts()) {
+                if (!Test.IsRunningTest()) {
+                    response = NewsAPIService.getTopHeadlinesByCategory(category.Name,3,1);
+                } else {
+                    response = NewsAPIService.parseResponse(NewsAPIMock.createSuccessMock().respond(new HttpRequest()).getBody());
+                }
+                List<Article__c> articles = response.toSObjects(category.Id, category.Name);
+                articlesToInsert.addAll(articles);
+                News_Category__c categoryToUpdate = new News_Category__c(Id = category.Id, Sync__c = false, Last_Synced__c = System.now());
+                categoriesToUpdate.add(categoryToUpdate);
+            }   
         }
 
         if (!articlesToInsert.isEmpty()) {
