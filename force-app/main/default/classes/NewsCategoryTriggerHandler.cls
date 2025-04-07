@@ -98,8 +98,7 @@ public with sharing class NewsCategoryTriggerHandler {
             return;
         }
     
-        for (News_Category__c category : categoriesToSync) {
-            System.enqueueJob(new NewsCategoryQueueable(category.Id, category.Name, 1 ));
-    }
+        News_Category__c category = categoriesToSync[0];
+        System.enqueueJob(new NewsCategoryQueueable(category.Id, category.Name, 1));
     }
 }
