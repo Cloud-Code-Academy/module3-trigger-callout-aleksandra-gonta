@@ -2,6 +2,7 @@
  * Queueable Apex class for processing News Category records with pagination support
  */
 public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts {
+    private static final Integer DEFAULT_PAGE_SIZE = 20; 
     private Id categoryId;
     private String categoryName;
     private Integer pages;
@@ -14,7 +15,10 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
      * @param pages Total pages to sync
      */
     public NewsCategoryQueueable(Id categoryId, String categoryName, Integer pages) {
-        // TODO: Initialize first page
+        this.categoryId = categoryId;
+        this.categoryName = categoryName;
+        this.pages = pages;
+        this.currentPage = 1; 
     }
     
     /**
@@ -25,7 +29,10 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
      * @param currentPage Current page being processed
      */
     public NewsCategoryQueueable(Id categoryId, String categoryName, Integer pages, Integer currentPage) {
-        // TODO: Initialize with specific page
+        this.categoryId = categoryId;
+        this.categoryName = categoryName;
+        this.pages = pages;
+        this.currentPage = currentPage;
     }
     
     /**
@@ -33,10 +40,36 @@ public class NewsCategoryQueueable implements Queueable, Database.AllowsCallouts
      * @param context The QueueableContext
      */
     public void execute(QueueableContext context) {
-        // TODO: Implement execute method
-        // - Call NewsAPI for the current page
-        // - Process and save articles
-        // - Update category if last page
-        // - Chain to next page if more pages exist
+        News_Category__c category = [SELECT Id, Name, Sync__c FROM News_Category__c WHERE Id = :categoryId LIMIT 1];
+        NewsAPIResponse response = NewsAPIService.getTopHeadlinesByCategory(categoryName, pages, currentPage);
+        List<Article__c> articlesToInsert = response.toSObjects(categoryId, categoryName);
+                   
+         if (!articlesToInsert.isEmpty()) {
+                insert articlesToInsert;
+            }
+
+        Integer totalResults = response.totalResults;
+        Integer totalPages = (Integer) Math.ceil((Decimal) totalResults / DEFAULT_PAGE_SIZE);
+        this.pages = totalPages;
+
+        if (currentPage < totalPages) {
+            System.enqueueJob(new NewsCategoryQueueable(categoryId, categoryName, pages, currentPage + 1));
+        } else {
+            category.Last_Synced__c = System.now();
+            category.Sync__c = false;
+            update category;
+        }
+
+        List<News_Category__c> remainingCategories = [
+            SELECT Id, Name 
+            FROM News_Category__c 
+            WHERE Sync__c = true
+            LIMIT 1
+        ];
+            
+        if (!remainingCategories.isEmpty()) {
+            News_Category__c nextCategory = remainingCategories[0];
+            System.enqueueJob(new NewsCategoryQueueable(nextCategory.Id, nextCategory.Name, 1));
+        }
     }
-} 
+}
