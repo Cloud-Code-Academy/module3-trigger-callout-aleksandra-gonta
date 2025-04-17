@@ -51,8 +51,11 @@ public with sharing class NewsAPIService {
                throw new NewsAPIException('Error: ' + response.getStatus() + ' - ' + response.getBody()); 
             }
         } catch (Exception e) {
-            throw new NewsAPIException('Error' + e.getMessage());
+            Logger.error( e.getMessage());
+        } finally{
+            Logger.saveLog(); 
         }
+
     }
     
     /**
@@ -64,7 +67,9 @@ public with sharing class NewsAPIService {
         try {
             return (NewsAPIResponse) JSON.deserialize(jsonResponse, NewsAPIResponse.class);
         } catch (System.JSONException e) {
-            throw new NewsAPIException('Failed to parse JSON response: ' + e.getMessage());
+            Logger.error('Failed to parse JSON response: ' + e.getMessage());
+        }finally{
+            Logger.saveLog(); 
         }
     }
     

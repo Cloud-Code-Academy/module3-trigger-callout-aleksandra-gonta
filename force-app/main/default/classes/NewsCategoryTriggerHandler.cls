@@ -11,7 +11,7 @@ public with sharing class NewsCategoryTriggerHandler {
     public static void handleInsert(List<News_Category__c> newRecords) {
         List<String> categoriesToSync = new List<String>();
         for (News_Category__c category : newRecords) {
-            if (category.Sync__c == true && String.isNotBlank(category.Name)) {
+            if (category.Sync__c && String.isNotBlank(category.Name)) {
                 categoriesToSync.add(category.Name);
             }
         }
